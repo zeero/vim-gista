@@ -138,121 +138,12 @@ function! s:_create_authorization(params, client, username, password, ...) abort
 endfunction
 
 function! s:_authorize(client, username, ...) abort
-  let options = extend({
-        \ 'verbose': 1,
-        \}, get(a:000, 0, {}),
-        \)
-  redraw
-  echohl Question
-  let password = inputsecret(printf(
-        \ 'Please input a password of "%s" in "%s": ',
-        \ a:username, a:client.baseurl,
-        \))
-  echohl None
-  if empty(password)
-    return ''
-  endif
-  let res = s:_list_authorizations(a:client, a:username, password, {
-        \ 'verbose': options.verbose,
-        \})
-  " check if OTP is required
-  if len(filter(res.header, 'stridx(v:val, "X-GitHub-OTP:") == 0'))
-    redraw
-    echohl Question
-    let otp = input('Please input a six digit two-factor authentication code: ')
-    echohl None
-    if empty(otp)
-      return ''
-    endif
-    " re-authorize with OTP
-    if options.verbose
-      redraw
-      echo 'Requesting an authorization token with OTP ...'
-    endif
-    let res = s:_list_authorizations(a:client, a:username, password, {
-          \ 'verbose': options.verbose,
-          \ 'otp': otp,
-          \})
-  else
-    let otp = ''
-  endif
-  if res.status != 200
-    call s:_throw([
-          \ printf(
-          \   'Authorization as "%s" in "%s" has failed',
-          \   a:username, a:client.baseurl
-          \ ),
-          \ printf('%s: %s', res.status, res.statusText),
-          \ get(res.content, 'message', ''),
-          \])
-  endif
-  let note = a:client.get_authorize_note()
-  let authorizations = res.content
-  let authorization = get(filter(
-        \ copy(authorizations),
-        \ '!empty(v:val.note) && v:val.note ==# note'
-        \), 0, {})
-  while !empty(authorization)
-    redraw
-    echohl WarningMsg
-    echo printf('A personal access token for "%s" exists', note)
-    echohl None
-    let intans = inputlist([
-          \ 'Would you like to:',
-          \ '1. Overwrite existing access token',
-          \ '2. Give a new access token name',
-          \])
-    if intans == 1
-      let res = s:_delete_authorization(
-            \ authorization.id, a:client, a:username, password, {
-            \   'verbose': options.verbose,
-            \   'otp': otp,
-            \})
-      if res.status != 204
-        call s:_throw([
-              \ printf(
-              \   'Authorization as "%s" in "%s" has failed',
-              \   a:username, a:client.baseurl
-              \ ),
-              \ printf('%s: %s', res.status, res.statusText),
-              \ get(res.content, 'message', ''),
-              \])
-      endif
-      break
-    elseif intans == 2
-      let note = input(printf('%s -> ', note), note)
-      if empty(note)
-        return ''
-      endif
-      let authorization = get(filter(
-            \ copy(authorizations),
-            \ '!empty(v:val.note) && v:val.note ==# note'
-            \), 0, {})
-    else
-      return ''
-    endif
-  endwhile
-  let params = {
-        \ 'scopes':   a:client.get_authorize_scopes(),
-        \ 'note':     note,
-        \ 'note_url': a:client.get_authorize_note_url(),
-        \}
-  let res = s:_create_authorization(
-        \ params, a:client, a:username, password, {
-        \   'verbose': options.verbose,
-        \   'otp': otp,
-        \})
-  if res.status != 201
-    call s:_throw([
-          \ printf(
-          \   'Authorization as "%s" in "%s" has failed',
-          \   a:username, a:client.baseurl
-          \ ),
-          \ printf('%s: %s', res.status, res.statusText),
-          \ get(res.content, 'message', ''),
-          \])
-  endif
-  return res.content.token
+  call s:_throw([
+        \ 'GitHub Authorizations API has been deprecated and is no longer available.',
+        \ 'Please create a Personal Access Token (classic) on GitHub and',
+        \ 'manually register it in vim-gista.',
+        \ 'See https://github.com/lambdalisue/vim-gista#authorization for more details.',
+        \])
 endfunction
 function! s:_authenticate(client, username, token, ...) abort
   let options = extend({
@@ -435,35 +326,36 @@ function! s:parse_response(response) abort
         \}
 endfunction
 function! s:parse_response_etag(response) abort
-  return matchstr(
-        \ matchstr(a:response.header, '^ETag:'),
-        \ '^ETag: \zs.*$',
-        \)
+  let lines = filter(copy(a:response.header), 'v:val =~? "^ETag:"')
+  return matchstr(get(lines, 0, ''), '^ETag: \zs.*$')
 endfunction
 function! s:parse_response_link(response) abort
   " https://developer.github.com/guides/traversing-with-pagination/#navigating-through-the-pages
-  let bits = split(matchstr(a:response.header, '^Link:'), ',')
+  let lines = filter(copy(a:response.header), 'v:val =~? "^Link:"')
   let links = {}
-  for bit in bits
-    let m = matchlist(bit, '<\(.*\)>; rel="\(.*\)"')
-    if empty(m)
-      continue
-    endif
-    let links[m[2]] = m[1]
+  for line in lines
+    let bits = split(matchstr(line, '^Link: \zs.*$'), ',')
+    for bit in bits
+      let m = matchlist(bit, '<\(.*\)>; rel="\(.*\)"')
+      if empty(m)
+        continue
+      endif
+      let links[m[2]] = m[1]
+    endfor
   endfor
   return links
 endfunction
 function! s:parse_response_rate_limit(response) abort
   let limit = matchstr(
-        \ matchstr(a:response.header, '^X-RateLimit-Limit:'),
+        \ get(filter(copy(a:response.header), 'v:val =~? "^X-RateLimit-Limit:"'), 0, ''),
         \ '^X-RateLimit-Limit: \zs\d\+$'
         \)
   let remaining = matchstr(
-        \ matchstr(a:response.header, '^X-RateLimit-Remaining:'),
+        \ get(filter(copy(a:response.header), 'v:val =~? "^X-RateLimit-Remaining:"'), 0, ''),
         \ '^X-RateLimit-Remaining: \zs\d\+$'
         \)
   let reset = matchstr(
-        \ matchstr(a:response.header, '^X-RateLimit-Reset:'),
+        \ get(filter(copy(a:response.header), 'v:val =~? "^X-RateLimit-Reset:"'), 0, ''),
         \ '^X-RateLimit-Reset: \zs\d\+$'
         \)
   if empty(limit) && empty(remaining) && empty(reset)
@@ -476,10 +368,8 @@ function! s:parse_response_rate_limit(response) abort
         \}
 endfunction
 function! s:parse_response_last_modified(response) abort
-  return matchstr(
-        \ matchstr(a:response.header, '^Last-Modified:'),
-        \ '^Last-Modified: \zs.*$'
-        \)
+  let lines = filter(copy(a:response.header), 'v:val =~? "^Last-Modified:"')
+  return matchstr(get(lines, 0, ''), '^Last-Modified: \zs.*$')
 endfunction
 
 function! s:build_exception_message(response, ...) abort
