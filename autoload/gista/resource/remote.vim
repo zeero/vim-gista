@@ -42,7 +42,8 @@ function! gista#resource#remote#get(gistid, ...) abort
         \ 'Fetching a gist %s in %s ...',
         \ a:gistid, client.apiname,
         \))
-  let url = 'gists/' . a:gistid
+  let gistid = split(a:gistid, '/')[-1]
+  let url = 'gists/' . gistid
   let res = client.get(url, {}, {
         \ 'If-Modified-Since': local_gist._gista_last_modified,
         \})
@@ -273,7 +274,8 @@ function! gista#resource#remote#patch(gistid, ...) abort
         \ 'Patching contents to a gist %s in %s ...',
         \ gist.id, client.apiname,
         \))
-  let url = 'gists/' . a:gistid
+  let gistid = split(a:gistid, '/')[-1]
+  let url = 'gists/' . gistid
   let res = client.patch(url, partial)
   redraw
   if res.status == 200
@@ -321,7 +323,8 @@ function! gista#resource#remote#delete(gistid, ...) abort
         \ 'Deleting a gist %s in %s ...',
         \ a:gistid, client.apiname,
         \))
-  let url = 'gists/' . a:gistid
+  let gistid = split(a:gistid, '/')[-1]
+  let url = 'gists/' . gistid
   let res = client.delete(url)
   redraw
   if res.status == 204
@@ -350,7 +353,8 @@ function! gista#resource#remote#star(gistid, ...) abort
         \ 'Star a gist %s in %s ...',
         \ a:gistid, client.apiname,
         \))
-  let url = printf('gists/%s/star', a:gistid)
+  let gistid = split(a:gistid, '/')[-1]
+  let url = printf('gists/%s/star', gistid)
   let headers = { 'Content-Length': 0 }
   let res = client.put(url, {}, headers)
   redraw
@@ -380,7 +384,8 @@ function! gista#resource#remote#unstar(gistid, ...) abort
         \ 'Unstar a gist %s in %s ...',
         \ a:gistid, client.apiname,
         \))
-  let url = printf('gists/%s/star', a:gistid)
+  let gistid = split(a:gistid, '/')[-1]
+  let url = printf('gists/%s/star', gistid)
   let res = client.delete(url)
   redraw
   if res.status == 204
@@ -408,7 +413,8 @@ function! gista#resource#remote#fork(gistid, ...) abort
         \ 'Forking a gist %s in %s ...',
         \ a:gistid, client.apiname,
         \))
-  let url = printf('gists/%s/forks', a:gistid)
+  let gistid = split(a:gistid, '/')[-1]
+  let url = printf('gists/%s/forks', gistid)
   let res = client.post(url)
   redraw
   if res.status == 201
@@ -436,7 +442,8 @@ function! gista#resource#remote#commits(gistid, ...) abort
         \ 'Fetching commits of a gist %s in %s ...',
         \ a:gistid, client.apiname,
         \))
-  let url = printf('gists/%s/commits', a:gistid)
+  let gistid = split(a:gistid, '/')[-1]
+  let url = printf('gists/%s/commits', gistid)
   let res = client.get(url)
   redraw
   if res.status == 200

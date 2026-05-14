@@ -138,7 +138,7 @@ def _vim_vital_web_api_github_main():
             response_link = request_head(url, 'link', headers=headers)
             if response_link:
                 m = re.search(
-                    '<.*?[?&]page=(\d+)[^>]*>; rel="last"', response_link
+                    r'<.*?[?&]page=(\d+)[^>]*>; rel="last"', response_link
                 )
                 page_end = int(m.group(1)) if m else 1
             else:
